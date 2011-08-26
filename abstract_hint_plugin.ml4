@@ -20,70 +20,57 @@ let get_fresh_theorem_name prefix =
 
 (****************)
 let my_occur_var id c =
-        let rec occur_rec c =
-                match kind_of_term c with
-                | Var i -> if id == i then raise Occur
-                | _ -> iter_constr occur_rec c
+  let rec occur_rec c =
+    match kind_of_term c with
+    | Var i -> if id == i then raise Occur
+    | _ -> iter_constr occur_rec c
   in
   try occur_rec c; false with
-  Occur -> true
+    Occur -> true
 
 
 let occur_id id c =
-        (my_occur_var id c) || not (noccurn 1 c)
+  (my_occur_var id c) || not (noccurn 1 c)
 
 
 (*
-Implements the delayed generalisation algorithm to remove superflous assumptions from a cached lemma
-*)
+  Implements the delayed generalisation algorithm to remove superflous assumptions from a cached lemma
+ *)
 let rec remove_unused_lambdas r ty =
-  match kind_of_term r with
-  | Lambda (name,t,c) ->
-    (match kind_of_term ty with
-    | Prod (pa,pb,pc) ->
-    (match name with
+  match kind_of_term r, kind_of_term ty with
+  | Lambda (name,t,c), Prod (pa,pb,pc) ->
+      let (l,c,pc) = remove_unused_lambdas c pc in
+      let (lambda_used, lambda_usedp) = (match name with
         Name id ->
-          (* Check if the lambda term is used. As the lambda term variable could be referred
-          to with Rel, we cannot just check for Var id terms. *)
-          let (l,c,pc) = remove_unused_lambdas c pc in
-          let lambda_used = occur_id id c in
-          let lambda_usedp = occur_id id pc in
-          (if lambda_used || lambda_usedp then
-            (* Keep this lambda term *)
-            (false::l,mkLambda (name, t, c), mkProd (pa,pb,pc))
-          else
-            (* Remove this lambda term. *)
-            (true::l, (lift (-1) c), (lift (-1) pc)))
+	  (* Check if the lambda term is used. As the lambda term variable could be referred
+	     to with Rel, we cannot just check for Var id terms. *)
+	  occur_id id c, occur_id id pc
       | Anonymous ->
-          let (l, c,pc) = remove_unused_lambdas c pc in
-          let lambda_used = not (noccurn 1 c) in
-          let lambda_usedp = not (noccurn 1 c) in
-          (if lambda_used || lambda_usedp then
-            (* Keep this lambda term *)
-            (false::l,mkLambda (name, t, c), mkProd (pa,pb,pc))
-          else
-            (* Remove this lambda term. *)
-            (true::l,(lift (-1) c), (lift (-1) pc)))
-    )
-    | _ -> ([],r,ty))
-    | _ ->  ([],r,ty)
+	  not (noccurn 1 c), not (noccurn 1 c)) in
+      (if lambda_used || lambda_usedp then
+	(* Keep this lambda term *)
+	(false::l,mkLambda (name, t, c), mkProd (pa,pb,pc))
+      else
+	(* Remove this lambda term. *)
+	(true::l, (lift (-1) c), (lift (-1) pc)))
+  | _ ->  ([],r,ty)
 
 (* Tactic that takes a list of bools, and introduces the
  * hypotheses corresponding to the true values (leaving
  * the ones corresponding to false in the goal. *)
 let rec intro_specified l =
-    match l with
-    | [] -> tclIDTAC
-    | b :: l -> (intro_then (fun id ->
-        let tac = intro_specified l in
-        if b then tac
-        else tclTHEN tac (revert [id])))
+  match l with
+  | [] -> tclIDTAC
+  | b :: l -> (intro_then (fun id ->
+      let tac = intro_specified l in
+      if b then tac
+      else tclTHEN tac (revert [id])))
 
 (* Adds a cached lemma to suitable lemma databases *)
 let auto_add_hint id bases g =
   let add_hints_iff l2r lc n bl =
     Auto.add_hints false bl (Auto.HintsResolveEntry (List.map (fun x -> (n, l2r,
-    None, x)) lc)) in
+									 None, x)) lc)) in
   (let priority = Some 0 (* "trivial" will only use priority 0 rules *) in
   add_hints_iff false [(Constrintern.global_reference id)] priority bases)
 
@@ -121,15 +108,15 @@ let lemma_cache ?(add_as_hint=true) prefix solving_tactic bases g =
   if add_as_hint then auto_add_hint id bases g;
 
   (* Solve this subgoal using the optimised proof o. It is important to not use the unoptimised proof term as the latter
-  may use superflous assumptions, which then makes it impossible for these to be removed from the top-level cached lemma *)
+     may use superflous assumptions, which then makes it impossible for these to be removed from the top-level cached lemma *)
   let (_,l) = Util.list_chop (type_nprod - concl_nprod) l in
   tclTHEN (intro_specified l)
-  (apply (Constrintern.global_reference (id)))
-  g
+    (apply (Constrintern.global_reference (id)))
+    g
 
 TACTIC EXTEND abstract_hint
-  | [ "abstract_hint" "[" preident_list(bases) "]" tactic(t)] -> [ lemma_cache
-  "userhint" (Tacinterp.eval_tactic t) bases]
-  | [ "abstract_hint" ident(name) "[" preident_list(bases) "]" tactic(t)] -> [ lemma_cache
-(string_of_id name) (Tacinterp.eval_tactic t) bases]
+  | [ "abstract_hint" "[" preident_list(bases) "]" tactic(t)]
+    -> [ lemma_cache "userhint" (Tacinterp.eval_tactic t) bases]
+  | [ "abstract_hint" ident(name) "[" preident_list(bases) "]" tactic(t)]
+    -> [ lemma_cache (string_of_id name) (Tacinterp.eval_tactic t) bases]
 END
