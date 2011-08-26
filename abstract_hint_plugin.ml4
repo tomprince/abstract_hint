@@ -8,46 +8,12 @@
 
 (*i camlp4deps: "parsing/grammar.cma" i*)
 
-open List
-open Printf
-open Cctac
-open Tactics
-open Tacticals
-open Hipattern
 open Names
-open Libnames
-open Proof_type
+open Tacmach
 open Tacticals
-open Tacinterp
 open Tactics
-open Pp
-open Util
-open Univ
-open Term
-open Environ
-open Extraargs
-open Mod_subst
-open Evd
-open Libnames
-open Coqlib
-open Term
-open Names
-open Util
-open Printer
-open Clenv
-open Clenvtac
-open Nameops
-open Sign
 open Term
 open Termops
-open Declarations
-open Inductive
-open Inductiveops
-open Reductionops
-open Environ
-open Libnames
-open Tacred
-open Tacmach
 
 let get_fresh_theorem_name prefix =
   Namegen.next_global_ident_away (id_of_string prefix) (Pfedit.get_all_proof_names ())
@@ -156,7 +122,7 @@ let lemma_cache ?(add_as_hint=true) prefix solving_tactic bases g =
 
   (* Solve this subgoal using the optimised proof o. It is important to not use the unoptimised proof term as the latter
   may use superflous assumptions, which then makes it impossible for these to be removed from the top-level cached lemma *)
-  let (_,l) = list_chop (type_nprod - concl_nprod) l in
+  let (_,l) = Util.list_chop (type_nprod - concl_nprod) l in
   tclTHEN (intro_specified l)
   (apply (Constrintern.global_reference (id)))
   g
