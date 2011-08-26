@@ -1,0 +1,8 @@
+/Makefile
+/Makefile-localvars.gen
+*.cmi
+*.cmo
+*.cmx
+*.cmxs
+*.d
+*.o

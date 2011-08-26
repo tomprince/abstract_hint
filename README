@@ -1,0 +1,3 @@
+This plugin contains a tactic to add a proof of a subgoal as a lemma and a hint.
+
+The code for this plugin is due to Sean Wilson, from the rippling plugin.
